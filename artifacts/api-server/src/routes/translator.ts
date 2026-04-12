@@ -17,23 +17,12 @@ router.post("/translate", async (req, res) => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.2",
-      max_completion_tokens: 8192,
+      model: "gpt-5-mini",
+      max_completion_tokens: 4096,
       messages: [
         {
           role: "system",
-          content: `You are a professional Chinese to Vietnamese translator with deep knowledge of Classical and Modern Chinese. 
-When given Chinese text, you must return a JSON object with:
-1. "translatedText": the full Vietnamese translation (natural, idiomatic Vietnamese)
-2. "pinyin": the full pinyin romanization of the original text (with tone marks)
-3. "dictionary": an array of unique Chinese words/characters found in the text, each with:
-   - "simplified": the simplified Chinese character(s)
-   - "traditional": the traditional Chinese character(s) (if different)
-   - "pinyin": pinyin with tone marks for this word
-   - "meanings": array of Vietnamese meanings/definitions (2-5 meanings covering different contexts)
-   - "examples": array of 1-2 example sentences, each with "chinese", "pinyin", and "vietnamese"
-
-Return ONLY valid JSON, no markdown, no explanation.`,
+          content: "Bạn là dịch giả chuyên nghiệp Trung-Việt. Dịch văn bản tiếng Trung sang tiếng Việt tự nhiên, chuẩn xác. Chỉ trả về bản dịch tiếng Việt, không giải thích, không ghi thêm gì khác.",
         },
         {
           role: "user",
@@ -42,36 +31,13 @@ Return ONLY valid JSON, no markdown, no explanation.`,
       ],
     });
 
-    const rawResponse = completion.choices[0]?.message?.content ?? "{}";
-    let parsed: {
-      translatedText?: string;
-      pinyin?: string;
-      dictionary?: Array<{
-        simplified: string;
-        traditional?: string;
-        pinyin: string;
-        meanings: string[];
-        examples?: Array<{ chinese: string; pinyin: string; vietnamese: string }>;
-      }>;
-    };
-
-    try {
-      parsed = JSON.parse(rawResponse);
-    } catch {
-      parsed = { translatedText: rawResponse, pinyin: "", dictionary: [] };
-    }
+    const translatedText = completion.choices[0]?.message?.content?.trim() ?? "";
 
     const result = {
       originalText: text,
-      translatedText: parsed.translatedText ?? "",
-      pinyin: parsed.pinyin ?? "",
-      dictionary: (parsed.dictionary ?? []).map((d) => ({
-        simplified: d.simplified,
-        traditional: d.traditional,
-        pinyin: d.pinyin,
-        meanings: d.meanings,
-        examples: d.examples ?? [],
-      })),
+      translatedText,
+      pinyin: "",
+      dictionary: [],
     };
 
     if (saveToHistory && result.translatedText) {
