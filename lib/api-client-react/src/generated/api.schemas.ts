@@ -8,3 +8,48 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface TranslateRequest {
+  /** Chinese text to translate */
+  text: string;
+  /** Whether to save this translation to history */
+  saveToHistory?: boolean;
+}
+
+export type DictionaryWordExamplesItem = {
+  chinese: string;
+  pinyin: string;
+  vietnamese: string;
+};
+
+export interface DictionaryWord {
+  simplified: string;
+  traditional?: string;
+  pinyin: string;
+  meanings: string[];
+  examples?: DictionaryWordExamplesItem[];
+}
+
+export interface TranslateResponse {
+  originalText: string;
+  translatedText: string;
+  pinyin: string;
+  dictionary: DictionaryWord[];
+}
+
+export interface DictionaryEntry {
+  word: string;
+  entries: DictionaryWord[];
+}
+
+export interface TranslationHistory {
+  id: number;
+  originalText: string;
+  translatedText: string;
+  pinyin: string;
+  createdAt: string;
+}
+
+export type LookupDictionaryParams = {
+  word: string;
+};

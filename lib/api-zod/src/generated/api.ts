@@ -14,3 +14,84 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary Translate Chinese text to Vietnamese with dictionary
+ */
+export const TranslateBody = zod.object({
+  text: zod.string().describe("Chinese text to translate"),
+  saveToHistory: zod
+    .boolean()
+    .optional()
+    .describe("Whether to save this translation to history"),
+});
+
+export const TranslateResponse = zod.object({
+  originalText: zod.string(),
+  translatedText: zod.string(),
+  pinyin: zod.string(),
+  dictionary: zod.array(
+    zod.object({
+      simplified: zod.string(),
+      traditional: zod.string().optional(),
+      pinyin: zod.string(),
+      meanings: zod.array(zod.string()),
+      examples: zod
+        .array(
+          zod.object({
+            chinese: zod.string(),
+            pinyin: zod.string(),
+            vietnamese: zod.string(),
+          }),
+        )
+        .optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Look up a Chinese word/character in the dictionary
+ */
+export const LookupDictionaryQueryParams = zod.object({
+  word: zod.coerce.string(),
+});
+
+export const LookupDictionaryResponse = zod.object({
+  word: zod.string(),
+  entries: zod.array(
+    zod.object({
+      simplified: zod.string(),
+      traditional: zod.string().optional(),
+      pinyin: zod.string(),
+      meanings: zod.array(zod.string()),
+      examples: zod
+        .array(
+          zod.object({
+            chinese: zod.string(),
+            pinyin: zod.string(),
+            vietnamese: zod.string(),
+          }),
+        )
+        .optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get recent translation history
+ */
+export const GetHistoryResponseItem = zod.object({
+  id: zod.number(),
+  originalText: zod.string(),
+  translatedText: zod.string(),
+  pinyin: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const GetHistoryResponse = zod.array(GetHistoryResponseItem);
+
+/**
+ * @summary Delete a specific history entry
+ */
+export const DeleteHistoryParams = zod.object({
+  id: zod.coerce.number(),
+});

@@ -6,4 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./dictionaryEntry";
+export * from "./dictionaryWord";
+export * from "./dictionaryWordExamplesItem";
 export * from "./healthStatus";
+export * from "./lookupDictionaryParams";
+export * from "./translateRequest";
+export * from "./translateResponse";
+export * from "./translationHistory";

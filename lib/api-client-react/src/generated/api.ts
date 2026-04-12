@@ -5,18 +5,28 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  DictionaryEntry,
+  HealthStatus,
+  LookupDictionaryParams,
+  TranslateRequest,
+  TranslateResponse,
+  TranslationHistory,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -99,3 +109,424 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Translate Chinese text to Vietnamese with dictionary
+ */
+export const getTranslateUrl = () => {
+  return `/api/translate`;
+};
+
+export const translate = async (
+  translateRequest: TranslateRequest,
+  options?: RequestInit,
+): Promise<TranslateResponse> => {
+  return customFetch<TranslateResponse>(getTranslateUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(translateRequest),
+  });
+};
+
+export const getTranslateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof translate>>,
+    TError,
+    { data: BodyType<TranslateRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof translate>>,
+  TError,
+  { data: BodyType<TranslateRequest> },
+  TContext
+> => {
+  const mutationKey = ["translate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof translate>>,
+    { data: BodyType<TranslateRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return translate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TranslateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof translate>>
+>;
+export type TranslateMutationBody = BodyType<TranslateRequest>;
+export type TranslateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Translate Chinese text to Vietnamese with dictionary
+ */
+export const useTranslate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof translate>>,
+    TError,
+    { data: BodyType<TranslateRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof translate>>,
+  TError,
+  { data: BodyType<TranslateRequest> },
+  TContext
+> => {
+  return useMutation(getTranslateMutationOptions(options));
+};
+
+/**
+ * @summary Look up a Chinese word/character in the dictionary
+ */
+export const getLookupDictionaryUrl = (params: LookupDictionaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/dictionary?${stringifiedParams}`
+    : `/api/dictionary`;
+};
+
+export const lookupDictionary = async (
+  params: LookupDictionaryParams,
+  options?: RequestInit,
+): Promise<DictionaryEntry> => {
+  return customFetch<DictionaryEntry>(getLookupDictionaryUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getLookupDictionaryQueryKey = (
+  params?: LookupDictionaryParams,
+) => {
+  return [`/api/dictionary`, ...(params ? [params] : [])] as const;
+};
+
+export const getLookupDictionaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof lookupDictionary>>,
+  TError = ErrorType<unknown>,
+>(
+  params: LookupDictionaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof lookupDictionary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getLookupDictionaryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof lookupDictionary>>
+  > = ({ signal }) => lookupDictionary(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof lookupDictionary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type LookupDictionaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof lookupDictionary>>
+>;
+export type LookupDictionaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Look up a Chinese word/character in the dictionary
+ */
+
+export function useLookupDictionary<
+  TData = Awaited<ReturnType<typeof lookupDictionary>>,
+  TError = ErrorType<unknown>,
+>(
+  params: LookupDictionaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof lookupDictionary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getLookupDictionaryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get recent translation history
+ */
+export const getGetHistoryUrl = () => {
+  return `/api/history`;
+};
+
+export const getHistory = async (
+  options?: RequestInit,
+): Promise<TranslationHistory[]> => {
+  return customFetch<TranslationHistory[]>(getGetHistoryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetHistoryQueryKey = () => {
+  return [`/api/history`] as const;
+};
+
+export const getGetHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetHistoryQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getHistory>>> = ({
+    signal,
+  }) => getHistory({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHistory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getHistory>>
+>;
+export type GetHistoryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get recent translation history
+ */
+
+export function useGetHistory<
+  TData = Awaited<ReturnType<typeof getHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHistoryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Clear all translation history
+ */
+export const getClearHistoryUrl = () => {
+  return `/api/history`;
+};
+
+export const clearHistory = async (options?: RequestInit): Promise<void> => {
+  return customFetch<void>(getClearHistoryUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getClearHistoryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearHistory>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clearHistory>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["clearHistory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clearHistory>>,
+    void
+  > = () => {
+    return clearHistory(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClearHistoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clearHistory>>
+>;
+
+export type ClearHistoryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Clear all translation history
+ */
+export const useClearHistory = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearHistory>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clearHistory>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getClearHistoryMutationOptions(options));
+};
+
+/**
+ * @summary Delete a specific history entry
+ */
+export const getDeleteHistoryUrl = (id: number) => {
+  return `/api/history/${id}`;
+};
+
+export const deleteHistory = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteHistoryUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteHistoryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteHistory>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteHistory>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteHistory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteHistory>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteHistory(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteHistoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteHistory>>
+>;
+
+export type DeleteHistoryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a specific history entry
+ */
+export const useDeleteHistory = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteHistory>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteHistory>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteHistoryMutationOptions(options));
+};

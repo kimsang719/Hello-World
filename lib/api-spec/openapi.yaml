@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: translator
+    description: Chinese to Vietnamese translation and dictionary
 paths:
   /healthz:
     get:
@@ -24,6 +26,77 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /translate:
+    post:
+      operationId: translate
+      tags: [translator]
+      summary: Translate Chinese text to Vietnamese with dictionary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslateRequest"
+      responses:
+        "200":
+          description: Translation result with dictionary info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslateResponse"
+  /dictionary:
+    get:
+      operationId: lookupDictionary
+      tags: [translator]
+      summary: Look up a Chinese word/character in the dictionary
+      parameters:
+        - name: word
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dictionary entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DictionaryEntry"
+  /history:
+    get:
+      operationId: getHistory
+      tags: [translator]
+      summary: Get recent translation history
+      responses:
+        "200":
+          description: List of recent translations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TranslationHistory"
+    delete:
+      operationId: clearHistory
+      tags: [translator]
+      summary: Clear all translation history
+      responses:
+        "204":
+          description: History cleared
+  /history/{id}:
+    delete:
+      operationId: deleteHistory
+      tags: [translator]
+      summary: Delete a specific history entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
 components:
   schemas:
     HealthStatus:
@@ -33,4 +106,96 @@ components:
           type: string
       required:
         - status
-
+    TranslateRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Chinese text to translate
+        saveToHistory:
+          type: boolean
+          description: Whether to save this translation to history
+      required:
+        - text
+    DictionaryWord:
+      type: object
+      properties:
+        simplified:
+          type: string
+        traditional:
+          type: string
+        pinyin:
+          type: string
+        meanings:
+          type: array
+          items:
+            type: string
+        examples:
+          type: array
+          items:
+            type: object
+            properties:
+              chinese:
+                type: string
+              pinyin:
+                type: string
+              vietnamese:
+                type: string
+            required:
+              - chinese
+              - pinyin
+              - vietnamese
+      required:
+        - simplified
+        - pinyin
+        - meanings
+    TranslateResponse:
+      type: object
+      properties:
+        originalText:
+          type: string
+        translatedText:
+          type: string
+        pinyin:
+          type: string
+        dictionary:
+          type: array
+          items:
+            $ref: "#/components/schemas/DictionaryWord"
+      required:
+        - originalText
+        - translatedText
+        - pinyin
+        - dictionary
+    DictionaryEntry:
+      type: object
+      properties:
+        word:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/DictionaryWord"
+      required:
+        - word
+        - entries
+    TranslationHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        originalText:
+          type: string
+        translatedText:
+          type: string
+        pinyin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - originalText
+        - translatedText
+        - pinyin
+        - createdAt
