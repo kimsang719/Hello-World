@@ -3,8 +3,13 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { loadVietPhraseDictionary } from "./lib/vietphrase";
 
 const app: Express = express();
+
+loadVietPhraseDictionary().catch((err) => {
+  logger.error({ err }, "Failed to load VietPhrase dictionary");
+});
 
 app.use(
   pinoHttp({

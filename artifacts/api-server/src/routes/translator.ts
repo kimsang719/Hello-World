@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, translationsTable } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 import { TranslateBody, LookupDictionaryQueryParams } from "@workspace/api-zod";
+import { translateWithDictionary, isDictionaryLoaded } from "../lib/vietphrase";
 
 const router = Router();
 
@@ -15,44 +15,33 @@ router.post("/translate", async (req, res) => {
 
   const { text, saveToHistory } = parse.data;
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      max_completion_tokens: 4096,
-      messages: [
-        {
-          role: "system",
-          content: "Bạn là dịch giả chuyên nghiệp Trung-Việt. Dịch văn bản tiếng Trung sang tiếng Việt tự nhiên, chuẩn xác. Chỉ trả về bản dịch tiếng Việt, không giải thích, không ghi thêm gì khác.",
-        },
-        {
-          role: "user",
-          content: text,
-        },
-      ],
-    });
+  if (!isDictionaryLoaded()) {
+    res.status(503).json({ error: "Từ điển chưa sẵn sàng, vui lòng thử lại sau" });
+    return;
+  }
 
-    const translatedText = completion.choices[0]?.message?.content?.trim() ?? "";
+  const translatedText = translateWithDictionary(text);
 
-    const result = {
-      originalText: text,
-      translatedText,
-      pinyin: "",
-      dictionary: [],
-    };
+  const result = {
+    originalText: text,
+    translatedText,
+    pinyin: "",
+    dictionary: [],
+  };
 
-    if (saveToHistory && result.translatedText) {
+  if (saveToHistory && translatedText) {
+    try {
       await db.insert(translationsTable).values({
         originalText: text,
-        translatedText: result.translatedText,
-        pinyin: result.pinyin,
+        translatedText,
+        pinyin: "",
       });
+    } catch (err) {
+      req.log.warn({ err }, "Failed to save to history");
     }
-
-    res.json(result);
-  } catch (err) {
-    req.log.error({ err }, "Translation error");
-    res.status(500).json({ error: "Translation failed" });
   }
+
+  res.json(result);
 });
 
 router.get("/dictionary", async (req, res) => {
@@ -63,49 +52,14 @@ router.get("/dictionary", async (req, res) => {
   }
 
   const { word } = parse.data;
+  const translation = translateWithDictionary(word);
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.2",
-      max_completion_tokens: 4096,
-      messages: [
-        {
-          role: "system",
-          content: `You are a comprehensive Chinese-Vietnamese dictionary. When given a Chinese word or character, return a JSON object with:
-- "word": the queried word
-- "entries": array of dictionary entries, each with:
-  - "simplified": simplified Chinese
-  - "traditional": traditional Chinese (if different)
-  - "pinyin": pinyin with tone marks
-  - "meanings": array of Vietnamese meanings/definitions (3-6 meanings for different contexts: noun, verb, adjective uses etc.)
-  - "examples": array of 2-3 example sentences, each with "chinese", "pinyin", and "vietnamese"
-
-Return ONLY valid JSON, no markdown.`,
-        },
-        {
-          role: "user",
-          content: word,
-        },
-      ],
-    });
-
-    const rawResponse = completion.choices[0]?.message?.content ?? "{}";
-    let parsed: { word?: string; entries?: unknown[] };
-
-    try {
-      parsed = JSON.parse(rawResponse);
-    } catch {
-      parsed = { word, entries: [] };
-    }
-
-    res.json({
-      word,
-      entries: parsed.entries ?? [],
-    });
-  } catch (err) {
-    req.log.error({ err }, "Dictionary lookup error");
-    res.status(500).json({ error: "Dictionary lookup failed" });
-  }
+  res.json({
+    word,
+    entries: translation !== word
+      ? [{ simplified: word, pinyin: "", meanings: [translation], examples: [] }]
+      : [],
+  });
 });
 
 router.get("/history", async (req, res) => {
